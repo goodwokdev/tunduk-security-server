@@ -1,0 +1,124 @@
+# Значения по умолчанию для tunduk-security-server.
+# Это второй флавор развёртывания. Опорный флавор - docker-compose в корне репозитория.
+# Контракт (тег образа, имена переменных, раскладка томов, политика портов) совпадает с compose.
+
+# Сервер безопасности (X-Road sidecar).
+securityServer:
+  image:
+    repository: niis/xroad-security-server-sidecar
+    # ВАЖНО: full-образ (не -slim). slim не умеет журналирование сообщений,
+    # а 3-летнее хранение журнала обязательно по правилам Тундука.
+    tag: "7.4.2"
+    pullPolicy: IfNotPresent
+
+  # ЖЁСТКОЕ ОГРАНИЧЕНИЕ. У сервера уникальная личность (ключи AUTH/SIGN + код сервера).
+  # replicas: 2+ = одна личность с нескольких адресов, Тундук отклонит это как конфликт.
+  # Чарт падает при replicaCount > 1 (см. statefulset-ss.yaml). Не трогай без HA-топологии.
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      memory: 4Gi
+
+  # Постоянное состояние. Потеря etcXroad = перевыпуск всех сертификатов.
+  persistence:
+    etcXroad:
+      size: 1Gi
+      # storageClass: ""   # пусто = дефолтный StorageClass кластера
+    varXroad:
+      # Архив журнала сообщений (хранится 3 года). Заложи запас.
+      size: 20Gi
+      # storageClass: ""
+
+  # Зонды. Сигнал готовности - админ-панель на :4000 (надёжно до и после регистрации).
+  startupProbe:
+    # Щедрое окно: JVM-службы + первичная инициализация БД на первом старте долгие.
+    failureThreshold: 60
+    periodSeconds: 10
+  readinessProbe:
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 6
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Учётные данные и PIN. Имена переменных совпадают с .env compose-флавора.
+auth:
+  # PIN программного токена. Минимум 15 символов, верхний/нижний регистр, цифры, знаки.
+  # Потеря PIN = перевыпуск сертификатов.
+  tokenPin: "change-me-Min15Chars!"
+  adminUser: "xrd-admin"
+  adminPassword: "change-me-strong-password"
+  # Для prod рекомендуется готовый Secret вместо значений выше.
+  # Должен содержать ключи: XROAD_TOKEN_PIN, XROAD_ADMIN_USER, XROAD_ADMIN_PASSWORD, XROAD_DB_PWD
+  existingSecret: ""
+
+# База данных.
+postgresql:
+  # true  -> чарт разворачивает встроенный postgres:12 StatefulSet (зеркало compose).
+  # false -> используется externalDatabase ниже.
+  embedded: true
+  image:
+    # ВАЖНО: ровно мажор 12. Образ SS несёт PG12, бэкап/восстановление ломается между мажорами.
+    repository: postgres
+    tag: "12"
+    pullPolicy: IfNotPresent
+  # Пароль суперпользователя postgres. SS подключается им и сам создаёт нужные базы и роли.
+  # Если задан auth.existingSecret, пароль берётся оттуда (ключ XROAD_DB_PWD).
+  password: "change-me-db-superuser-password"
+  persistence:
+    size: 10Gi
+    # storageClass: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+# Внешняя БД (используется только при postgresql.embedded=false).
+externalDatabase:
+  host: ""
+  port: 5432
+  # Мажор обязан быть 12 (см. выше). Пароль суперпользователя берётся из
+  # auth.existingSecret (ключ XROAD_DB_PWD) либо из postgresql.password.
+
+# Уровень логирования X-Road.
+logLevel: INFO
+
+# Service-ы. Принцип портов как в compose: наружу осознанно только 5500/5577 (там mTLS),
+# всё остальное по умолчанию внутри кластера.
+service:
+  # Админ-панель (4000). Достаётся через kubectl port-forward.
+  admin:
+    type: ClusterIP
+    port: 4000
+  # Точки доступа информационных систем (8080/8443). Для своих приложений в кластере.
+  is:
+    type: ClusterIP
+    httpPort: 8080
+    httpsPort: 8443
+  # Обмен между серверами безопасности + OCSP (5500/5577). Единственное, что выходит наружу.
+  # Переключи type на LoadBalancer или NodePort, чтобы открыть в сеть X-Road.
+  xroad:
+    type: ClusterIP
+    messagingPort: 5500
+    ocspPort: 5577
+
+# Ingress для админ-панели. По умолчанию выключен - предпочтителен port-forward.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: ""
+  tls: []
+
+serviceAccount:
+  create: true
+  name: ""
+
+podSecurityContext: {}
+securityContext: {}

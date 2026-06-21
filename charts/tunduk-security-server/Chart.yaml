@@ -1,0 +1,16 @@
+apiVersion: v2
+name: tunduk-security-server
+description: Сервер безопасности Тундук (X-Road 7.4.2) для Kubernetes - одиночный production-faithful инстанс
+type: application
+# version - версия самого чарта; appVersion - версия X-Road в образе.
+version: 0.1.0
+appVersion: "7.4.2"
+keywords:
+  - tunduk
+  - x-road
+  - security-server
+home: https://wiki.tunduk.kg/
+sources:
+  - https://github.com/nordic-institute/X-Road
+maintainers:
+  - name: Slava Kim

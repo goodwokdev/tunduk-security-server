@@ -1,0 +1,139 @@
+{{- /*
+  Guard: уникальная личность сервера не масштабируется наивно.
+  replicas > 1 = одна личность с нескольких адресов, Тундук отклонит как конфликт.
+  Падаем явно, чтобы это нельзя было сломать случайно.
+*/ -}}
+{{- if gt (int .Values.securityServer.replicaCount) 1 }}
+{{- fail "securityServer.replicaCount должен быть 1: у сервера безопасности уникальная личность (ключи + код сервера), наивное масштабирование невозможно. Для отказоустойчивости нужна отдельная HA-топология X-Road." }}
+{{- end }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "tunduk.ss.fullname" . }}
+  labels:
+    {{- include "tunduk.labels" . | nindent 4 }}
+    {{- include "tunduk.ss.selectorLabels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "tunduk.ss.fullname" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "tunduk.ss.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tunduk.ss.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "tunduk.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.securityServer.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.securityServer.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.securityServer.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: security-server
+          image: "{{ .Values.securityServer.image.repository }}:{{ .Values.securityServer.image.tag }}"
+          imagePullPolicy: {{ .Values.securityServer.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: XROAD_TOKEN_PIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tunduk.secretName" . }}
+                  key: XROAD_TOKEN_PIN
+            - name: XROAD_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tunduk.secretName" . }}
+                  key: XROAD_ADMIN_USER
+            - name: XROAD_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tunduk.secretName" . }}
+                  key: XROAD_ADMIN_PASSWORD
+            - name: XROAD_DB_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tunduk.secretName" . }}
+                  key: XROAD_DB_PWD
+            # XROAD_DB_HOST != 127.0.0.1 включает режим внешней БД: встроенный
+            # в образ postgres не стартует, базы создаются на указанном хосте.
+            - name: XROAD_DB_HOST
+              value: {{ include "tunduk.dbHost" . | quote }}
+            - name: XROAD_DB_PORT
+              value: {{ include "tunduk.dbPort" . | quote }}
+            - name: XROAD_LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+          ports:
+            - name: admin
+              containerPort: 4000
+            - name: health
+              containerPort: 5588
+            - name: messaging
+              containerPort: 5500
+            - name: ocsp
+              containerPort: 5577
+            - name: is-http
+              containerPort: 8080
+            - name: is-https
+              containerPort: 8443
+          # Готовность - админ-панель на :4000 (надёжный сигнал до и после регистрации).
+          startupProbe:
+            httpGet:
+              path: /
+              port: admin
+              scheme: HTTPS
+            failureThreshold: {{ .Values.securityServer.startupProbe.failureThreshold }}
+            periodSeconds: {{ .Values.securityServer.startupProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: admin
+              scheme: HTTPS
+            periodSeconds: {{ .Values.securityServer.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.securityServer.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.securityServer.readinessProbe.failureThreshold }}
+          {{- with .Values.securityServer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: etc-xroad
+              mountPath: /etc/xroad
+            - name: var-xroad
+              mountPath: /var/lib/xroad
+  volumeClaimTemplates:
+    - metadata:
+        name: etc-xroad
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.securityServer.persistence.etcXroad.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.securityServer.persistence.etcXroad.size | quote }}
+    - metadata:
+        name: var-xroad
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.securityServer.persistence.varXroad.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.securityServer.persistence.varXroad.size | quote }}

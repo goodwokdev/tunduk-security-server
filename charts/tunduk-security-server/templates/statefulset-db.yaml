@@ -1,0 +1,63 @@
+{{- /* Встроенный PostgreSQL 12. Разворачивается только при postgresql.embedded=true. */ -}}
+{{- if .Values.postgresql.embedded }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "tunduk.db.fullname" . }}
+  labels:
+    {{- include "tunduk.labels" . | nindent 4 }}
+    {{- include "tunduk.db.selectorLabels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "tunduk.db.fullname" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "tunduk.db.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tunduk.db.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres
+          # ВАЖНО: мажор 12, как внутри образа SS. Иначе ломается бэкап/восстановление.
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tunduk.secretName" . }}
+                  key: XROAD_DB_PWD
+            # PGDATA в подкаталоге: том lost+found не мешает инициализации кластера.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 30
+          {{- with .Values.postgresql.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.postgresql.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.persistence.size | quote }}
+{{- end }}

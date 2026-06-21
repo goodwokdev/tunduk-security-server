@@ -3,6 +3,19 @@
 Production single-VM deployment of a **Tunduk / СМЭВ «Түндүк»** security server,
 built on the official, production-supported **NIIS X-Road Security Server Sidecar**.
 
+## Two flavors
+
+The same server, two ways to run it. Both share one contract: image
+`niis/xroad-security-server-sidecar:7.4.2`, PostgreSQL 12, safe-by-default ports,
+persistent state. The registration flow in [SETUP.md](SETUP.md) is identical.
+
+| Flavor | Where | Use it for |
+|---|---|---|
+| **docker-compose** (root) | single VM | the reference flavor — simplest to read and stand up |
+| **Helm chart** ([charts/tunduk-security-server](charts/tunduk-security-server)) | Kubernetes | single-instance, production-faithful deploy in a cluster |
+
+Newcomer guide (RU): [docs/guide-for-newcomers.md](docs/guide-for-newcomers.md).
+
 ## Why no custom image
 
 The Tunduk apt repo (`deb.tunduk.kg/ubuntu22.04-7.4.2`) ships **byte-identical

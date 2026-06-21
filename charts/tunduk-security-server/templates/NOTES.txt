@@ -1,0 +1,31 @@
+Сервер безопасности Тундук (X-Road {{ .Chart.AppVersion }}) развёрнут.
+
+Релиз:    {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+База:     {{ if .Values.postgresql.embedded }}встроенный postgres:{{ .Values.postgresql.image.tag }}{{ else }}внешняя ({{ .Values.externalDatabase.host }}:{{ include "tunduk.dbPort" . }}){{ end }}
+
+1) Дождись готовности (первый старт долгий: JVM-службы + инициализация БД):
+
+   kubectl -n {{ .Release.Namespace }} rollout status statefulset/{{ include "tunduk.ss.fullname" . }} --timeout=15m
+
+2) Открой админ-панель через port-forward (по умолчанию наружу не торчит):
+
+   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "tunduk.ss.fullname" . }}-admin 4000:{{ .Values.service.admin.port }}
+
+   Затем браузер: https://localhost:4000  (сертификат самоподписанный)
+   Логин/пароль: из {{ if .Values.auth.existingSecret }}Secret {{ .Values.auth.existingSecret }}{{ else }}auth.adminUser / auth.adminPassword{{ end }}
+
+3) Сервер запущен, но ещё НЕ зарегистрирован в Тундуке. Процесс регистрации
+   (якорь, ключи AUTH/SIGN, сертификаты от УЦ, подсистема) одинаков для обоих
+   флаворов и описан в SETUP.md в корне репозитория.
+
+{{- if eq .Values.service.xroad.type "ClusterIP" }}
+
+ВНИМАНИЕ: service.xroad.type=ClusterIP - порты 5500/5577 не видны вне кластера.
+Для реального обмена с сетью X-Road переключи на LoadBalancer или NodePort.
+{{- end }}
+{{- if not .Values.auth.existingSecret }}
+
+ВНИМАНИЕ: используются пароли из values. Для prod задай auth.existingSecret
+с ключами XROAD_TOKEN_PIN, XROAD_ADMIN_USER, XROAD_ADMIN_PASSWORD, XROAD_DB_PWD.
+{{- end }}

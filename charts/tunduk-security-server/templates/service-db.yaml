@@ -1,0 +1,18 @@
+{{- /* Headless service для StatefulSet встроенной БД. Только при embedded=true. */ -}}
+{{- if .Values.postgresql.embedded }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tunduk.db.fullname" . }}
+  labels:
+    {{- include "tunduk.labels" . | nindent 4 }}
+    {{- include "tunduk.db.selectorLabels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "tunduk.db.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+{{- end }}

@@ -1,0 +1,60 @@
+{{- /* Админ-панель (4000). Достаётся через kubectl port-forward. */ -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tunduk.ss.fullname" . }}-admin
+  labels:
+    {{- include "tunduk.labels" . | nindent 4 }}
+    {{- include "tunduk.ss.selectorLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.admin.type }}
+  selector:
+    {{- include "tunduk.ss.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: admin
+      port: {{ .Values.service.admin.port }}
+      targetPort: admin
+---
+{{/* Точки доступа информационных систем (8080/8443) - для приложений в кластере. */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tunduk.ss.fullname" . }}-is
+  labels:
+    {{- include "tunduk.labels" . | nindent 4 }}
+    {{- include "tunduk.ss.selectorLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.is.type }}
+  selector:
+    {{- include "tunduk.ss.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: is-http
+      port: {{ .Values.service.is.httpPort }}
+      targetPort: is-http
+    - name: is-https
+      port: {{ .Values.service.is.httpsPort }}
+      targetPort: is-https
+---
+{{/*
+  Обмен между серверами безопасности + OCSP (5500/5577).
+  Единственное, что осознанно выходит наружу (там mTLS).
+  Переключи service.xroad.type на LoadBalancer/NodePort, чтобы открыть в сеть X-Road.
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tunduk.ss.fullname" . }}-xroad
+  labels:
+    {{- include "tunduk.labels" . | nindent 4 }}
+    {{- include "tunduk.ss.selectorLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.xroad.type }}
+  selector:
+    {{- include "tunduk.ss.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: messaging
+      port: {{ .Values.service.xroad.messagingPort }}
+      targetPort: messaging
+    - name: ocsp
+      port: {{ .Values.service.xroad.ocspPort }}
+      targetPort: ocsp
