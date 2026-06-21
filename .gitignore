@@ -1,0 +1,16 @@
+# Secrets — never commit
+.env
+
+# Configuration anchor — issued per-deployment by the Tunduk admin
+anchor/
+*.anchor.xml
+configuration_anchor*.xml
+
+# Local backups
+backup/out/
+*.tar.gz
+*.sql.gz
+
+# Editor/OS noise
+*.swp
+.DS_Store
