@@ -18,7 +18,7 @@
 ## Установка
 
 ```bash
-helm install tunduk ./charts/tunduk-security-server \
+helm install tunduk ./helm-charts/tunduk-security-server \
   --namespace tunduk --create-namespace \
   --set auth.tokenPin='ВашPIN-минимум-15-символов' \
   --set auth.adminPassword='сильный-пароль-панели' \
@@ -34,7 +34,7 @@ kubectl -n tunduk create secret generic tunduk-creds \
   --from-literal=XROAD_ADMIN_PASSWORD='...' \
   --from-literal=XROAD_DB_PWD='...'
 
-helm install tunduk ./charts/tunduk-security-server \
+helm install tunduk ./helm-charts/tunduk-security-server \
   --namespace tunduk \
   --set auth.existingSecret=tunduk-creds
 ```
@@ -68,7 +68,7 @@ PG12 уже снят с поддержки (EOL); риск снижаем тем
 ## Внешняя БД
 
 ```bash
-helm install tunduk ./charts/tunduk-security-server \
+helm install tunduk ./helm-charts/tunduk-security-server \
   --namespace tunduk \
   --set postgresql.embedded=false \
   --set externalDatabase.host=mydb.internal \
@@ -81,7 +81,7 @@ helm install tunduk ./charts/tunduk-security-server \
 ## Открыть порты обмена наружу
 
 ```bash
-helm upgrade tunduk ./charts/tunduk-security-server -n tunduk \
+helm upgrade tunduk ./helm-charts/tunduk-security-server -n tunduk \
   --reuse-values \
   --set service.xroad.type=LoadBalancer
 ```
@@ -109,6 +109,6 @@ helm upgrade tunduk ./charts/tunduk-security-server -n tunduk \
 ## Проверка чарта
 
 ```bash
-helm lint ./charts/tunduk-security-server
-helm template tunduk ./charts/tunduk-security-server
+helm lint ./helm-charts/tunduk-security-server
+helm template tunduk ./helm-charts/tunduk-security-server
 ```

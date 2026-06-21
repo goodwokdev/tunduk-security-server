@@ -66,6 +66,7 @@ Docker-стек (см. [README.md](README.md)) даёт запущенный, н
 ## 2. Поднять стек
 
 ```bash
+cd docker-compose
 cp .env.example .env
 # Отредактируй .env: XROAD_TOKEN_PIN (== твой SoftToken PIN), учётка панели, пароль БД.
 docker compose up -d
@@ -165,16 +166,18 @@ backup/backup.sh
 # создаёт backup/out/{db,etc-xroad,var-lib-xroad}-<stamp>.{sql.gz,tar.gz}
 ```
 
-**Восстановление** на чистый стек (та же версия образа, Postgres 12):
+**Восстановление** на чистый стек (та же версия образа, Postgres 12). Команды
+запускаются из каталога `docker-compose/`, бэкапы лежат в `../backup/out/`:
 
 ```bash
+cd docker-compose
 docker compose up -d db                       # запустить только БД
-gunzip -c backup/out/db-<stamp>.sql.gz | \
+gunzip -c ../backup/out/db-<stamp>.sql.gz | \
   docker compose exec -T -e PGPASSWORD="$XROAD_DB_PWD" db psql -U postgres
 docker compose up -d                          # запустить SS
 # восстанови /etc/xroad и /var/lib/xroad в их тома, например:
-docker compose exec -T security-server tar -C / -xzf - < backup/out/etc-xroad-<stamp>.tar.gz
-docker compose exec -T security-server tar -C / -xzf - < backup/out/var-lib-xroad-<stamp>.tar.gz
+docker compose exec -T security-server tar -C / -xzf - < ../backup/out/etc-xroad-<stamp>.tar.gz
+docker compose exec -T security-server tar -C / -xzf - < ../backup/out/var-lib-xroad-<stamp>.tar.gz
 docker compose restart security-server
 ```
 

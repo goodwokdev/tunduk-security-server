@@ -8,10 +8,12 @@
 # Restore: see SETUP.md ("Backup & restore").
 set -euo pipefail
 
-# Resolve repo root regardless of where the script is invoked from.
+# Resolve paths regardless of where the script is invoked from.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-cd "$REPO_DIR"
+# The compose file and its .env live in docker-compose/. Run docker compose there.
+COMPOSE_DIR="$REPO_DIR/docker-compose"
+cd "$COMPOSE_DIR"
 
 # Load DB password from .env (XROAD_DB_PWD).
 [ -f .env ] && set -a && . ./.env && set +a
