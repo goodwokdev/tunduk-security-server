@@ -1,7 +1,51 @@
-# Сервер безопасности Тундук (X-Road 7.4.2) - Docker Compose
+# Сервер безопасности Тундук (X-Road 7.4.2)
 
-Развёртывание сервера безопасности Тундук (СМЭВ "Түндүк") для одной виртуалки,
-на официальном, поддерживаемом для production образе NIIS X-Road Security Server Sidecar.
+Развёртывание сервера безопасности Тундук (СМЭВ "Түндүк") на официальном,
+поддерживаемом для production образе NIIS X-Road Security Server Sidecar.
+Два способа запуска: docker-compose (одна виртуалка) и Helm-чарт (Kubernetes).
+
+Это репозиторий-ресурс для сисадминов, которые впервые разворачивают сервер
+безопасности у себя в инфраструктуре. Начни с индекса ниже.
+
+## Куда смотреть (индекс)
+
+| Что мне нужно | Куда смотреть |
+|---|---|
+| Понять, что это такое и как оно работает (новичку) | [docs/guide-for-newcomers.md](docs/guide-for-newcomers.md) |
+| Установить через docker-compose (одна виртуалка) | [Быстрый старт](#быстрый-старт) ниже + каталог [docker-compose/](docker-compose) |
+| Установить через Helm (Kubernetes) | [helm-charts/tunduk-security-server/README.md](helm-charts/tunduk-security-server/README.md) |
+| Пройти регистрацию в Тундуке (пошагово) | [SETUP.md](SETUP.md) |
+| Понять обязательные ручные шаги Тундука | [раздел ниже](#обязательные-ручные-административные-шаги-специфика-тундука) |
+| Эксплуатировать (логи, бэкап, обновление) | [Эксплуатация](#эксплуатация) ниже |
+
+## Обязательные ручные / административные шаги (специфика Тундука)
+
+Поднять контейнеры - это быстро. Но сервер станет рабочим участником Тундука только
+после административной процедуры, которую **нельзя автоматизировать**: в ней участвуют
+администраторы Тундука, удостоверяющий центр и госорганы, и у них свои сроки. Начинай
+эти шаги **в первый же день**, параллельно с установкой - иначе застрянешь на недели.
+
+- **Якорь конфигурации (anchor) + реквизиты участника** (member class и code) - получить
+  у администраторов Тундука. Без якоря сервер не привязан к сети.
+- **Договор с УЦ ГУ "Кызмат"** - юридические документы, есть срок оформления:
+  <https://gukyzmat.gov.kg/pki>.
+- **Подпись сертификатов** - отправить CSR (AUTH и SIGN) на почту УЦ **kuc@infocom.kg**.
+- **Регистрация сервера** в Тундуке и затем **регистрация подсистемы** - оба шага
+  требуют подтверждения на стороне Тундука (уведомить вручную).
+
+Полный порядок с деталями - в [SETUP.md](SETUP.md), начиная с раздела 0.
+
+## Внешняя документация
+
+- Тундук - установка сервера безопасности 7.4.2:
+  <https://wiki.tunduk.kg/doku.php?id=install-security-server-742>
+- Тундук - регистрация подсистемы:
+  <https://wiki.tunduk.kg/doku.php?id=registration-on-security-server-742-ubuntu2204>
+- NIIS - руководство по X-Road Security Server Sidecar:
+  <https://github.com/nordic-institute/X-Road/tree/master/doc/Sidecar>
+- NIIS - общая документация X-Road:
+  <https://docs.x-road.global/>
+- УЦ ГУ "Кызмат" (PKI): <https://gukyzmat.gov.kg/pki>
 
 ## Два флавора
 
@@ -13,8 +57,6 @@
 |---|---|---|
 | **docker-compose** ([docker-compose/](docker-compose)) | одна виртуалка | опорный флавор - проще всего читать и поднимать |
 | **Helm-чарт** ([helm-charts/tunduk-security-server](helm-charts/tunduk-security-server)) | Kubernetes | одиночный production-faithful инстанс в кластере |
-
-Руководство для новичков: [docs/guide-for-newcomers.md](docs/guide-for-newcomers.md).
 
 ## Почему нет своего образа
 
@@ -44,7 +86,9 @@
 
 ## Быстрый старт
 
-Файлы compose-флавора лежат в каталоге `docker-compose/`, команды запускай оттуда:
+Это путь для флавора docker-compose. Файлы лежат в каталоге `docker-compose/`,
+команды запускай оттуда. Для Kubernetes смотри
+[helm-charts/tunduk-security-server/README.md](helm-charts/tunduk-security-server/README.md).
 
 ```bash
 cd docker-compose
@@ -73,6 +117,7 @@ docker-compose/.env.example         шаблон секретов/портов -
 helm-charts/tunduk-security-server/ Helm-чарт (флавор для Kubernetes)
 backup/backup.sh                    pg_dumpall + tar обоих томов xroad (удобно для cron)
 SETUP.md                            пошаговый runbook по настройке от начала до конца
+docs/guide-for-newcomers.md         концептуальный гайд для новичков
 ```
 
 ## Требования (хост)
