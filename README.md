@@ -49,28 +49,34 @@
 
 ## Два флавора
 
-Один и тот же сервер, два способа его запустить. У обоих общий контракт: образ
-`niis/xroad-security-server-sidecar:7.4.2`, PostgreSQL 12, безопасные по умолчанию
-порты, постоянное состояние. Процесс регистрации в [SETUP.md](SETUP.md) одинаковый.
+Один и тот же сервер, два способа его запустить. У обоих общий контракт: патч-образ
+Тундука (см. ниже), PostgreSQL 12, безопасные по умолчанию порты, постоянное состояние.
+Процесс регистрации в [SETUP.md](SETUP.md) одинаковый.
 
 | Флавор | Где | Для чего |
 |---|---|---|
 | **docker-compose** ([docker-compose/](docker-compose)) | одна виртуалка | опорный флавор - проще всего читать и поднимать |
 | **Helm-чарт** ([helm-charts/tunduk-security-server](helm-charts/tunduk-security-server)) | Kubernetes | одиночный production-faithful инстанс в кластере |
 
-## Почему нет своего образа
+## Почему нужен тонкий патч-образ
 
-Репозиторий пакетов Тундука (`deb.tunduk.kg/ubuntu22.04-7.4.2`) отдаёт байт-в-байт
-те же пакеты NIIS - тот же maintainer (`NIIS <info@niis.org>`) и тот же git-хэш
-(`gita30be58`) во всех 28 пакетах. Никакого пакета `tunduk-*` нет.
+Раньше здесь было написано, что Тундук - это байт-в-байт ванильный NIIS и своего образа
+не нужно. Это оказалось неверно. Вывод был сделан по метаданным индекса пакетов (maintainer,
+версия, git-хэш - они и правда совпадают с NIIS), но содержимое пакетов не вскрывалось.
 
-Сервер становится "тундуковским" только через конфигурацию в рантайме - глобальный
-якорь конфигурации (anchor), который указывает на центральный сервер Тундука, а не
-через бинарник. Поэтому мы берём `niis/xroad-security-server-sidecar:7.4.2` как есть
-и грузим якорь при настройке. Меньше своего кода, нечего поддерживать в маппинге
-служб, обновления безопасности приходят простым `docker pull`.
+При вскрытии: в Тундуковском `xroad-proxy` (внутри `proxy.jar`) есть ровно 3 класса,
+которых НЕТ в официальном образе NIIS - провайдер профиля сертификата для УЦ Кыргызстана
+`KgSkKlass3CertificateProfileInfoProvider` (+2 inner). Без него сервер не сгенерирует CSR
+в формате, который примет УЦ "Кызмат" - на это и напарываются при создании ключа AUTH.
 
-> ВНИМАНИЕ: используй full-образ с тегом `7.4.2`, никогда не `-slim`. slim не умеет
+Поэтому "тундуковость" - это НЕ только якорь в рантайме. Есть ещё аддитивный патч в
+бинарнике. Мы накладываем его тонким образом `FROM niis/xroad-security-server-sidecar:7.4.2`,
+заменяя два jar (`proxy.jar`, `proxy-ui-api.jar`) на версии из официального репозитория
+Тундука. Это пакеты `Architecture: all` (чистая Java), поэтому overlay безопасен. Сборка
+и детали - в каталоге [image/](image), сравнение - в
+[спецификации](docs/superpowers/specs/2026-06-22-tunduk-patched-image-design.md).
+
+> ВНИМАНИЕ: базовый образ берём full с тегом `7.4.2`, никогда не `-slim`. slim не умеет
 > журналирование сообщений, а оно для Тундука обязательно (3-летнее хранение журнала
 > требуется по закону).
 
@@ -78,7 +84,7 @@
 
 | Сервис | Образ | Назначение |
 |---|---|---|
-| `security-server` | `niis/xroad-security-server-sidecar:7.4.2` | X-Road SS (supervisord запускает proxy, signer, confclient, proxy-ui-api, monitor, opmonitor, messagelog) |
+| `security-server` | `tunduk-security-server:7.4.2` (патч-образ, см. выше; база - `niis/xroad-security-server-sidecar:7.4.2`) | X-Road SS (supervisord запускает proxy, signer, confclient, proxy-ui-api, monitor, opmonitor, messagelog) |
 | `db` | `postgres:12` | базы serverconf + messagelog. **PG 12** - обязан совпадать с мажором внутри образа, иначе ломается бэкап/восстановление. |
 
 Состояние живёт в трёх именованных томах: `xroad-config` (`/etc/xroad`),
@@ -93,7 +99,7 @@
 ```bash
 cd docker-compose
 cp .env.example .env        # затем впиши: PIN, учётку панели, пароль БД
-docker compose up -d
+docker compose up -d --build   # --build собирает патч-образ Тундука из ../image при первом старте
 docker compose ps           # дождись, пока оба сервиса healthy
 ```
 
@@ -112,6 +118,7 @@ ssh -L 4000:127.0.0.1:4000 <vm-host>
 ## Файлы
 
 ```
+image/                              патч-образ Тундука (Dockerfile поверх NIIS sidecar)
 docker-compose/docker-compose.yml   стек из двух сервисов (SS + Postgres 12)
 docker-compose/.env.example         шаблон секретов/портов -> скопировать в .env
 helm-charts/tunduk-security-server/ Helm-чарт (флавор для Kubernetes)

@@ -5,9 +5,13 @@
 # Сервер безопасности (X-Road sidecar).
 securityServer:
   image:
-    repository: niis/xroad-security-server-sidecar
-    # ВАЖНО: full-образ (не -slim). slim не умеет журналирование сообщений,
+    # Это патч-образ Тундука (официальный NIIS sidecar + KG-класс профиля сертификата
+    # KgSkKlass3 для УЦ "Кызмат"). Чистый niis/xroad-security-server-sidecar НЕ подойдёт:
+    # в нём нет KG-профиля, и CSR для УЦ не сгенерировать. Образ нужно собрать из каталога
+    # image/ и запушить в свой реестр, затем указать его здесь (см. README чарта).
+    # ВАЖНО: базовый образ - full (не -slim): slim не умеет журналирование сообщений,
     # а 3-летнее хранение журнала обязательно по правилам Тундука.
+    repository: tunduk-security-server
     tag: "7.4.2"
     pullPolicy: IfNotPresent
 

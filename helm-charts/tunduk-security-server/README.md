@@ -2,9 +2,29 @@
 
 Сервер безопасности Тундук (X-Road 7.4.2) для Kubernetes. Это второй флавор
 развёртывания. Опорный, эталонный флавор - docker-compose в корне репозитория;
-по нему проще всего понять устройство. Чарт повторяет тот же контракт: официальный
-образ niis/xroad-security-server-sidecar:7.4.2, PostgreSQL 12, безопасные по
-умолчанию порты, постоянные тома.
+по нему проще всего понять устройство. Чарт повторяет тот же контракт: патч-образ
+Тундука (см. ниже), PostgreSQL 12, безопасные по умолчанию порты, постоянные тома.
+
+## Образ нужно собрать заранее
+
+Чарт использует НЕ официальный образ NIIS напрямую, а патч-образ Тундука: официальный
+NIIS sidecar плюс KG-класс профиля сертификата (KgSkKlass3, для УЦ "Кызмат"), которого в
+апстриме нет. Без него сервер не сгенерирует CSR в формате, который примет УЦ. Kubernetes
+не умеет собирать образ сам, поэтому собери его и запушь в свой реестр до установки:
+
+```bash
+docker build -t ghcr.io/<твой-namespace>/tunduk-security-server:7.4.2 image/
+docker push ghcr.io/<твой-namespace>/tunduk-security-server:7.4.2
+```
+
+Затем укажи его при установке (см. "Установка"):
+
+```bash
+--set securityServer.image.repository=ghcr.io/<твой-namespace>/tunduk-security-server
+```
+
+Подробности про патч - в каталоге `image/` и в
+`docs/superpowers/specs/2026-06-22-tunduk-patched-image-design.md`.
 
 ## Что разворачивается
 
@@ -33,6 +53,7 @@
 ```bash
 helm install tunduk ./helm-charts/tunduk-security-server \
   --namespace tunduk --create-namespace \
+  --set securityServer.image.repository=ghcr.io/<твой-namespace>/tunduk-security-server \
   --set auth.tokenPin='ВашPIN-минимум-15-символов' \
   --set auth.adminPassword='сильный-пароль-панели' \
   --set postgresql.password='пароль-суперпользователя-БД'
@@ -106,7 +127,8 @@ helm upgrade tunduk ./helm-charts/tunduk-security-server -n tunduk \
 
 | Значение | По умолчанию | Назначение |
 |---|---|---|
-| securityServer.image.tag | 7.4.2 | Тег образа (full, не slim) |
+| securityServer.image.repository | tunduk-security-server | Патч-образ Тундука; укажи свой реестр (см. "Образ нужно собрать заранее") |
+| securityServer.image.tag | 7.4.2 | Тег образа (база - full, не slim) |
 | securityServer.replicaCount | 1 | Жёстко 1, иначе чарт падает |
 | securityServer.persistence.etcXroad.size | 1Gi | Том /etc/xroad (ключи, сертификаты) |
 | securityServer.persistence.varXroad.size | 20Gi | Том /var/lib/xroad (журнал, 3 года) |
